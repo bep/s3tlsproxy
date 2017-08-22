@@ -17,6 +17,8 @@ package cmd
 import (
 	"log"
 
+	"github.com/bep/s3tlsproxy/lib"
+
 	"github.com/spf13/cobra"
 )
 
@@ -29,19 +31,33 @@ type Commandeer struct {
 }
 
 func New(logger *log.Logger) Commandeer {
-
 	c := Commandeer{logger: logger}
 
 	c.rootCmd = &cobra.Command{
 		Use:   "s3tlsproxy",
 		Short: "A caching proxy for Amazon S3 with automatic TLS.",
-		//	Run: func(cmd *cobra.Command, args []string) { },
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return c.runServer()
+		},
 	}
 
-	c.rootCmd.PersistentFlags().StringVar(&c.cfgFile, "config", "", "config file (default is ./.s3tlsproxy.toml)")
+	c.rootCmd.PersistentFlags().StringVar(&c.cfgFile, "config", "", "config file (default is ./config.toml)")
 
 	return c
 
+}
+
+func (c Commandeer) runServer() error {
+	filename := c.cfgFile
+	if filename == "" {
+		filename = "./config.toml"
+	}
+	cfg, err := lib.LoadConfig(filename)
+	if err != nil {
+		return err
+	}
+	c.logger.Println("Using config", cfg)
+	return nil
 }
 
 func (c Commandeer) Execute() error {

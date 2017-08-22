@@ -1,0 +1,19 @@
+cacheDir = "cache"
+TLSCertsDir = "certs"
+DBFilename = "db/s3p.db"
+serverAddr = ":8080"
+defaultHostAccessKey = "yourHostSecretAccessKey"
+defaultHostSecretKey = "yourHostSecretKey"
+secretKey = "yourSecret"
+
+[hosts]
+[hosts."example.org"]
+bucket = "bucket1"
+path = "path1"
+accessKey = "ac1"
+secretKey = "as1"
+[hosts."example.com"]
+bucket = "bucket2"
+path = "path2"
+accessKey = "ac2"
+secretKey = "as2"
