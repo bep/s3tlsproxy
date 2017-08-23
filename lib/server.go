@@ -29,6 +29,8 @@ type Server struct {
 }
 
 func NewServer(cfg Config, logger *log.Logger) (*Server, error) {
+	// TODO(bep) validate config
+
 	h := http.NewServeMux()
 	h.HandleFunc("/", handler(cfg, logger))
 
@@ -47,9 +49,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func handler(cfg Config, logger *log.Logger) http.HandlerFunc {
-	s3 := s3Client{cfg: cfg}
+	c := newCacheHandler(cfg, logger)
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := s3.Do(w, r)
+		err := c.handleRequest(w, r)
 		if err != nil {
 			logger.Println("error:", err)
 			// TODO(bep) status code/err handling

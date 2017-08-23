@@ -46,11 +46,16 @@ type Config struct {
 }
 
 type Host struct {
+	Name   string
 	Bucket string
 	Path   string
 
 	AccessKey string
 	SecretKey string
+}
+
+func (h Host) hostPath(in string) string {
+	return path.Join(h.Name, h.Bucket, h.Path, in)
 }
 
 func (h Host) bucketPath(in string) string {
@@ -64,6 +69,7 @@ func readConfig(r io.Reader) (Config, error) {
 	}
 
 	for name, host := range c.Hosts {
+		host.Name = name
 		if host.AccessKey == "" {
 			host.AccessKey = c.DefaultHostAccessKey
 		}

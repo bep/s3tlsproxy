@@ -15,41 +15,183 @@
 package lib
 
 import (
+	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/asdine/storm"
 )
 
-type FileHandler interface {
-	OpenFile(filename string) (io.ReadCloser, error)
-	DeleteFile(filename string) error
-}
+// A header represents the key-value pairs in a HTTP header.
+type header map[string][]string
 
-// A Header represents the key-value pairs in an HTTP header.
-type Header map[string][]string
-
-type File struct {
+type fileMeta struct {
 	// Path relative to cache dir: <host>/<bucket>/<bucketPath>/<filename>
-	Filename string `storm:"id`
+	// TODO(bep) consider bucket per host
+	Filename string `storm:"id"`
 
 	// Size in bytes.
 	Size int64
 
+	// File mod time
+	ModTime time.Time
+
+	// HTTP status code. Note that only HTTP 200's are stored on the file system.
+	StatusCode int
+
 	// We store a sub-set of the headers received from S3 and replay when
 	// reading from cache.
-	Header Header
+	Header header
 
 	CreatedAt time.Time `storm:"index"`
 }
 
-type DB struct {
-	filename string
+type readSeekCloser interface {
+	io.ReadSeeker
+	io.Closer
 }
 
-func (DB) open() (*storm.DB, error) {
-	return nil, nil
+type cacheHandler struct {
+	cfg     Config
+	logger  *log.Logger
+	storage s3Client
+}
+
+func newCacheHandler(cfg Config, logger *log.Logger) *cacheHandler {
+	return &cacheHandler{cfg: cfg, logger: logger, storage: s3Client{cfg: cfg}}
+}
+
+func (c *cacheHandler) handleRequest(rw http.ResponseWriter, req *http.Request) error {
+	urlPath := strings.TrimLeft(req.URL.Path, " /")
+
+	if urlPath == "" || strings.HasSuffix(urlPath, "/") {
+		// TODO(bep)
+		urlPath = path.Join(urlPath, "index.html")
+	}
+
+	host, found := c.cfg.host(req.Host)
+	if !found {
+		return fmt.Errorf("host %s not found", req.Host)
+	}
+
+	relPath := host.hostPath(urlPath)
+
+	meta, err := c.getFileMeta(relPath)
+	if err != nil {
+		return err
+	}
+
+	if meta != nil {
+		f, err := c.getFile(relPath)
+		if err != nil {
+			return err
+		}
+
+		if f == nil {
+			// File has been deleted by some other process.
+			// TODO(bep)
+			fmt.Println("TODO")
+			return nil
+		}
+
+		defer f.Close()
+		for k, v := range meta.Header {
+			for _, vv := range v {
+				rw.Header().Add(k, vv)
+			}
+
+			http.ServeContent(rw, req, urlPath, meta.ModTime, f)
+			return nil
+		}
+	}
+
+	meta, err = c.getAndWriteFile(urlPath, host, rw, req)
+	if err != nil {
+		return err
+	}
+
+	err = c.doWithDB(func(db *storm.DB) error {
+		return db.Save(meta)
+	})
+
+	return err
+}
+
+func (c *cacheHandler) getFileMeta(relPath string) (*fileMeta, error) {
+	db, err := c.openDB()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	var fm fileMeta
+
+	err = db.One("Filename", relPath, &fm)
+	if err != nil {
+		if err == storm.ErrNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &fm, nil
+}
+
+func (c *cacheHandler) getAndWriteFile(
+	urlPath string, host Host,
+	rw http.ResponseWriter, req *http.Request) (*fileMeta, error) {
+
+	// TODO(bep) temp file and rename
+	filename := filepath.Join(c.cfg.CacheDir, host.hostPath(urlPath))
+	dir := filepath.Dir(filename)
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, err
+	}
+
+	f, err := os.Create(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	// Write to both file and client at the same time.
+	mw := io.MultiWriter(rw, f)
+
+	return c.storage.getAndWrite(urlPath, host, mw, rw, req)
+
+}
+
+func (c *cacheHandler) getFile(relPath string) (readSeekCloser, error) {
+	filename := filepath.Join(c.cfg.CacheDir, filepath.FromSlash(relPath))
+	f, err := os.Open(filename)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return f, nil
+}
+
+// TODO(bep) transactions
+func (c *cacheHandler) doWithDB(f func(db *storm.DB) error) error {
+	db, err := c.openDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	return f(db)
+}
+
+func (c *cacheHandler) openDB() (*storm.DB, error) {
+	return storm.Open(c.cfg.DBFilename)
 }
 
 // Plans:
@@ -58,11 +200,6 @@ func (DB) open() (*storm.DB, error) {
 // If db.File => if os.File => OK
 // If db.File => if !os.File => delete db.File => stream and save db.File and os.File
 // If !db.File  => stream and save db.File and os.File
-func handleHTTPRequest(w http.ResponseWriter, r *http.Request) (status int, err error) {
-	// If cached, serve file:
-	// http.ServeContent
-	return 0, nil
-}
 
 // On server start:
 // For each os.File:
@@ -76,13 +213,3 @@ func handleHTTPRequest(w http.ResponseWriter, r *http.Request) (status int, err 
 
 // On Garbage Collect:
 //
-
-func (d DB) deleteFile(filename string) error {
-	db, err := d.open()
-	if err != nil {
-		return err
-	}
-
-	f := File{Filename: filename}
-	return db.DeleteStruct(&f)
-}

@@ -55,6 +55,7 @@ path = "path2"
 
 	assert.Equal("ac1", h.AccessKey)
 	assert.Equal("as1", h.SecretKey)
+	assert.Equal("example.org", h.Name)
 
 	h = c.Hosts["example.com"]
 

@@ -1,5 +1,7 @@
 # s3tlsproxy
 
+**NOTE: This is not ready for use.**
+
 WORK IN PROGRESS: Amazon S3 cache with auto TLS and virtual host support.
 
 **The main use case for this tool is to host a set of [Hugo](https://gohugo.io/) sites with automatic https, backed by one or more Amazon S3 buckets, with a cache and as little administration need as possible.**
