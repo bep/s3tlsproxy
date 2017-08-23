@@ -14,3 +14,4 @@
 .glide/
 
 s3tlsproxy
+config.secret.toml

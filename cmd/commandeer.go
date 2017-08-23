@@ -22,11 +22,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Commandeer holds the available CLI commands and their flag values.
+// Commandeer is the entry point for the different commands.
 type Commandeer struct {
-	logger  *log.Logger
 	cfgFile string
 
+	logger  *log.Logger
 	rootCmd *cobra.Command
 }
 
@@ -44,20 +44,14 @@ func New(logger *log.Logger) Commandeer {
 	c.rootCmd.PersistentFlags().StringVar(&c.cfgFile, "config", "", "config file (default is ./config.toml)")
 
 	return c
-
 }
 
-func (c Commandeer) runServer() error {
+func (c Commandeer) loadConfig() (lib.Config, error) {
 	filename := c.cfgFile
 	if filename == "" {
 		filename = "./config.toml"
 	}
-	cfg, err := lib.LoadConfig(filename)
-	if err != nil {
-		return err
-	}
-	c.logger.Println("Using config", cfg)
-	return nil
+	return lib.LoadConfig(filename)
 }
 
 func (c Commandeer) Execute() error {

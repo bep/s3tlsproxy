@@ -8,6 +8,7 @@ Planned features:
 
 * TLS via [https://letsencrypt.org/](https://letsencrypt.org/)
 * Virtual hosts support with S3 bucket sharing
+* Hot-Reloading of server, including adding and removing virtual hosts
 * Cache to save money on S3 bandwidth
 * Load balancing and HA via DNS
 * Cross-site (i.e. all servers in domain) cache purge from signed URLs
