@@ -16,7 +16,6 @@ package lib
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 )
@@ -31,7 +30,7 @@ type Server struct {
 
 func NewServer(cfg Config, logger *log.Logger) (*Server, error) {
 	h := http.NewServeMux()
-	h.HandleFunc("/", handler(cfg))
+	h.HandleFunc("/", handler(cfg, logger))
 
 	s := &http.Server{Addr: cfg.ServerAddr, Handler: h}
 
@@ -47,8 +46,13 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
 
-func handler(cfg Config) http.HandlerFunc {
+func handler(cfg Config, logger *log.Logger) http.HandlerFunc {
+	s3 := s3Client{cfg: cfg}
 	return func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "Hello World!")
+		err := s3.Do(w, r)
+		if err != nil {
+			logger.Println("error:", err)
+			// TODO(bep) status code/err handling
+		}
 	}
 }

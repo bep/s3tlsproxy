@@ -18,7 +18,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"sort"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -51,11 +53,26 @@ type Host struct {
 	SecretKey string
 }
 
+func (h Host) bucketPath(in string) string {
+	return path.Join(h.Path, in)
+}
+
 func readConfig(r io.Reader) (Config, error) {
 	var c Config
 	if _, err := toml.DecodeReader(r, &c); err != nil {
 		return c, fmt.Errorf("failed to read config: %s", err)
 	}
+
+	for name, host := range c.Hosts {
+		if host.AccessKey == "" {
+			host.AccessKey = c.DefaultHostAccessKey
+		}
+		if host.SecretKey == "" {
+			host.SecretKey = c.DefaultHostSecretKey
+		}
+		c.Hosts[name] = host
+	}
+
 	return c, nil
 }
 
@@ -77,6 +94,12 @@ func (c Config) hostNames() []string {
 	sort.Strings(names)
 
 	return names
+}
+
+func (c Config) host(hostName string) (Host, bool) {
+	hostName = strings.Split(hostName, ":")[0]
+	h, found := c.Hosts[hostName]
+	return h, found
 }
 
 func (c Config) isTLSConfigured() (bool, error) {

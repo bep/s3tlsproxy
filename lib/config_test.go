@@ -42,8 +42,6 @@ secretKey = "as1"
 [hosts."example.com"]
 bucket = "bucket2"
 path = "path2"
-accessKey = "ac2"
-secretKey = "as2"
 
 `
 	c, err := readConfig(strings.NewReader(basic))
@@ -52,6 +50,16 @@ secretKey = "as2"
 	assert.Equal("cache", c.CacheDir)
 	assert.Len(c.Hosts, 2)
 	assert.Equal([]string{"example.com", "example.org"}, c.hostNames())
+
+	h := c.Hosts["example.org"]
+
+	assert.Equal("ac1", h.AccessKey)
+	assert.Equal("as1", h.SecretKey)
+
+	h = c.Hosts["example.com"]
+
+	assert.Equal("yourHostSecretAccessKey", h.AccessKey)
+	assert.Equal("yourHostSecretKey", h.SecretKey)
 
 	// TODO(bep) env overrides
 
