@@ -44,6 +44,7 @@ func NewServer(cfg Config, logger *Logger) (*Server, error) {
 	c := newCacheHandler(cfg, logger)
 	mw := &httpHandlers{c: c}
 
+	// These are just temporary
 	var purger http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
 		prefix := r.FormValue("prefix")
 		if prefix != "" {
@@ -53,7 +54,16 @@ func NewServer(cfg Config, logger *Logger) (*Server, error) {
 		}
 	}
 
+	var shrinker http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
+		target := 50 << 10
+		if err := c.shrinkTo(int64(target)); err != nil {
+			c.logger.Error("area", "cache", "tag", "shrink", "error", err)
+		}
+
+	}
+
 	h.Handle("/purge", mw.secure(purger))
+	h.Handle("/shrink", mw.secure(shrinker))
 	h.Handle("/", mw.secure(mw.serveFile()))
 
 	tlsEnabled, err := cfg.isTLSConfigured()

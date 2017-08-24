@@ -15,6 +15,9 @@
 package lib
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/asdine/storm"
 	"github.com/asdine/storm/q"
 )
@@ -53,6 +56,66 @@ func (c *cacheHandler) purgePrefix(prefix string) error {
 	return nil
 }
 
-func (c *cacheHandler) shrinkTo(bytes int64) error {
+// This is a Least Recently Used (LRU) cache.
+// So: Sort by created and delete until we reach the target.
+func (c *cacheHandler) shrinkTo(target int64) error {
+	db, err := c.openDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	var files []fileMeta
+
+	err = db.AllByIndex("CreatedAt", &files)
+	if err != nil {
+		if err == storm.ErrNotFound {
+			return nil
+		}
+		return err
+	}
+
+	var (
+		totalSize int64 = 0
+		fileCount       = 0
+	)
+
+	for _, f := range files {
+		totalSize += f.Size
+		fileCount++
+	}
+
+	c.logger.Debug("area", "cache", "tag", "shrink",
+		"target", target,
+		"total", totalSize, "files", fileCount)
+
+	if totalSize <= target {
+		return nil
+	}
+
+	toDelete := totalSize - target
+
+	for i, file := range files {
+		if err := db.DeleteStruct(&file); err != nil && err != storm.ErrNotFound {
+			return err
+		}
+
+		osFilename := filepath.Join(c.cfg.CacheDir, filepath.FromSlash(file.Filename))
+
+		if err := os.Remove(osFilename); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+
+		toDelete -= file.Size
+
+		if toDelete <= 0 {
+			c.logger.Debug("area", "cache", "tag", "shrink",
+				"deleted", (i + 1))
+			break
+		}
+	}
+
 	return nil
 }
+
+// TODO(bep) Handle leftover directories

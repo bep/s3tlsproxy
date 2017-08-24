@@ -35,7 +35,7 @@ func (m *httpHandlers) secure(h http.Handler) http.Handler {
 		ContentTypeNosniff:   true,
 		BrowserXssFilter:     true,
 		//ContentSecurityPolicy: "default-src 'self'",
-		PublicKey: `pin-sha256="base64+primary=="; pin-sha256="base64+backup=="; max-age=5184000; includeSubdomains;"`,
+		//PublicKey: `pin-sha256="base64+primary=="; pin-sha256="base64+backup=="; max-age=5184000;"`,
 
 		IsDevelopment: false,
 	}).Handler(h)
