@@ -15,7 +15,6 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"github.com/bep/s3tlsproxy/cmd"
@@ -29,10 +28,9 @@ var (
 )
 
 func main() {
-	logger := log.New(os.Stderr, "", log.LstdFlags)
 
-	c := cmd.New(logger)
+	c := cmd.New()
 	if err := c.Execute(); err != nil {
-		logger.Fatal("error: ", err)
+		os.Exit(-1)
 	}
 }

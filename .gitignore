@@ -15,4 +15,5 @@
 
 s3tlsproxy
 config.secret.toml
+config.secret.localhost.toml
 testdata

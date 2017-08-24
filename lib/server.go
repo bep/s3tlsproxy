@@ -16,13 +16,10 @@ package lib
 
 import (
 	"context"
-	"log"
 	"net/http"
-	"os"
 
 	"crypto/tls"
 
-	"github.com/gorilla/handlers"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -31,17 +28,17 @@ type Server struct {
 	cfg        Config
 	tlsEnabled bool
 
-	logger *log.Logger
+	logger *Logger
 
 	server *http.Server
 }
 
-func NewServer(cfg Config, logger *log.Logger) (*Server, error) {
+func NewServer(cfg Config, logger *Logger) (*Server, error) {
 	// TODO(bep) validate config
 
 	h := http.NewServeMux()
 
-	h.Handle("/", handlers.LoggingHandler(os.Stdout, handler(cfg, logger)))
+	h.Handle("/", handler(cfg, logger))
 
 	tlsEnabled, err := cfg.isTLSConfigured()
 	if err != nil {
@@ -72,7 +69,7 @@ func NewServer(cfg Config, logger *log.Logger) (*Server, error) {
 }
 
 func (s *Server) Serve() error {
-	s.logger.Printf("Listening on %s ...\n", s.cfg.ServerAddr)
+	s.logger.Info("Listener", s.cfg.ServerAddr)
 	if s.tlsEnabled {
 		return s.server.ListenAndServeTLS("", "")
 	}
@@ -83,13 +80,13 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
 
-func handler(cfg Config, logger *log.Logger) http.HandlerFunc {
+func handler(cfg Config, logger *Logger) http.HandlerFunc {
 	c := newCacheHandler(cfg, logger)
 	return func(w http.ResponseWriter, r *http.Request) {
 		// TODO containsDotDot https://github.com/golang/go/blob/f9cf8e5ab11c7ea3f1b9fde302c0a325df020b1a/src/net/http/fs.go#L665
 		err := c.handleRequest(w, r)
 		if err != nil {
-			logger.Println("error:", err)
+			logger.Error(err)
 			// TODO(bep) status code/err handling
 		}
 	}

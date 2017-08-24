@@ -17,7 +17,6 @@ package lib
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -30,6 +29,15 @@ import (
 
 // A header represents the key-value pairs in a HTTP header.
 type header map[string][]string
+
+func (h header) String() string {
+	var s string
+	for k, v := range h {
+		s += fmt.Sprintf("%s: %v ", k, v)
+	}
+
+	return s
+}
 
 type fileMeta struct {
 	// Path relative to cache dir: <host>/<bucket>/<bucketPath>/<filename>
@@ -59,12 +67,12 @@ type readSeekCloser interface {
 
 type cacheHandler struct {
 	cfg     Config
-	logger  *log.Logger
+	logger  *Logger
 	storage s3Client
 }
 
-func newCacheHandler(cfg Config, logger *log.Logger) *cacheHandler {
-	return &cacheHandler{cfg: cfg, logger: logger, storage: s3Client{cfg: cfg}}
+func newCacheHandler(cfg Config, logger *Logger) *cacheHandler {
+	return &cacheHandler{cfg: cfg, logger: logger, storage: s3Client{cfg: cfg, logger: logger}}
 }
 
 func (c *cacheHandler) handleRequest(rw http.ResponseWriter, req *http.Request) error {
@@ -88,6 +96,8 @@ func (c *cacheHandler) handleRequest(rw http.ResponseWriter, req *http.Request) 
 	}
 
 	if meta != nil {
+		c.logger.Debug("fileMeta", meta.Filename, "status", meta.StatusCode, "header", meta.Header)
+
 		f, err := c.getFile(relPath)
 		if err != nil {
 			return err
@@ -161,7 +171,7 @@ func (c *cacheHandler) getAndWriteFile(
 	}
 	defer f.Close()
 
-	// Write to both file and client at the same time.
+	// Stream to both file and client at the same time.
 	mw := io.MultiWriter(rw, f)
 
 	return c.storage.getAndWrite(urlPath, host, mw, rw, req)

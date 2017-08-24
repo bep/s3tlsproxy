@@ -23,6 +23,8 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 )
 
 type Config struct {
@@ -89,6 +91,16 @@ func LoadConfig(filename string) (Config, error) {
 	}
 	defer f.Close()
 	return readConfig(f)
+}
+
+func (c Config) CreateLogger() *Logger {
+	// TODO(bep) configure
+	logger := log.NewLogfmtLogger(os.Stdout)
+	logger = level.NewFilter(logger, level.AllowAll())
+
+	l := NewLogger(logger)
+
+	return l
 }
 
 func (c Config) hostNames() []string {

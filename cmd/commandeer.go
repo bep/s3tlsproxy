@@ -15,8 +15,6 @@
 package cmd
 
 import (
-	"log"
-
 	"github.com/bep/s3tlsproxy/lib"
 
 	"github.com/spf13/cobra"
@@ -25,13 +23,13 @@ import (
 // Commandeer is the entry point for the different commands.
 type Commandeer struct {
 	cfgFile string
+	logger  *lib.Logger
 
-	logger  *log.Logger
 	rootCmd *cobra.Command
 }
 
-func New(logger *log.Logger) Commandeer {
-	c := Commandeer{logger: logger}
+func New() Commandeer {
+	c := Commandeer{}
 
 	c.rootCmd = &cobra.Command{
 		Use:   "s3tlsproxy",
@@ -55,5 +53,9 @@ func (c Commandeer) loadConfig() (lib.Config, error) {
 }
 
 func (c Commandeer) Execute() error {
-	return c.rootCmd.Execute()
+	if err := c.rootCmd.Execute(); err != nil {
+		c.logger.Error(err)
+		return err
+	}
+	return nil
 }

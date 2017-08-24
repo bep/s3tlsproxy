@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"context"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -30,13 +31,18 @@ func (c Commandeer) runServer() error {
 		return err
 	}
 
+	c.logger = cfg.CreateLogger()
+
 	server, err := lib.NewServer(cfg, c.logger)
 	if err != nil {
 		return err
 	}
 
 	go func() {
-		c.logger.Fatal(server.Serve())
+		if err := server.Serve(); err != nil {
+			c.logger.Error(err)
+			os.Exit(-1)
+		}
 	}()
 
 	signalChan := make(chan os.Signal, 1)
@@ -48,7 +54,7 @@ func (c Commandeer) runServer() error {
 		case syscall.SIGHUP:
 			// TODO(bep) reload
 		default:
-			c.logger.Printf("Captured %v. Exiting...", s)
+			log.Printf("Captured %v. Exiting...", s)
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			server.Shutdown(shutdownCtx)
@@ -56,7 +62,7 @@ func (c Commandeer) runServer() error {
 			<-shutdownCtx.Done()
 			err := shutdownCtx.Err()
 			if err != nil {
-				c.logger.Println(err)
+				c.logger.Error(err)
 			}
 			break
 		}

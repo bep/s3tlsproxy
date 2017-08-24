@@ -36,7 +36,8 @@ var s3HeadersBlacklist = map[string]bool{
 }
 
 type s3Client struct {
-	cfg Config
+	cfg    Config
+	logger *Logger
 }
 
 func (s s3Client) getAndWrite(path string, host Host,
@@ -102,6 +103,8 @@ func (s s3Client) getAndWrite(path string, host Host,
 		CreatedAt:  now,
 	}
 
+	s.logger.Debug("newFileMeta", fm.Filename, "status", fm.StatusCode, "header", fm.Header)
+
 	for k, v := range fm.Header {
 		for _, vv := range v {
 			rw.Header().Add(k, vv)
@@ -110,7 +113,7 @@ func (s s3Client) getAndWrite(path string, host Host,
 
 	rw.WriteHeader(resp.StatusCode)
 
-	fmt.Println("Stream from S3", path, "Status:", resp.StatusCode)
+	s.logger.Debug("s3StreamFrom", path, "status", resp.StatusCode)
 
 	var content io.Reader
 
