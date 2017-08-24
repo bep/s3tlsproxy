@@ -33,12 +33,18 @@ type Server struct {
 	server *http.Server
 }
 
+type httpHandlers struct {
+	cfg    Config
+	logger *Logger
+}
+
 func NewServer(cfg Config, logger *Logger) (*Server, error) {
 	// TODO(bep) validate config
 
 	h := http.NewServeMux()
+	mw := &httpHandlers{cfg: cfg, logger: logger}
 
-	h.Handle("/", handler(cfg, logger))
+	h.Handle("/", mw.secure(mw.serveFile()))
 
 	tlsEnabled, err := cfg.isTLSConfigured()
 	if err != nil {
@@ -80,13 +86,13 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
 
-func handler(cfg Config, logger *Logger) http.HandlerFunc {
-	c := newCacheHandler(cfg, logger)
+func (m *httpHandlers) serveFile() http.HandlerFunc {
+	c := newCacheHandler(m.cfg, m.logger)
 	return func(w http.ResponseWriter, r *http.Request) {
 		// TODO containsDotDot https://github.com/golang/go/blob/f9cf8e5ab11c7ea3f1b9fde302c0a325df020b1a/src/net/http/fs.go#L665
 		err := c.handleRequest(w, r)
 		if err != nil {
-			logger.Error("handleRequest", err)
+			m.logger.Error("handleRequest", err)
 			// TODO(bep) status code/err handling
 		}
 	}

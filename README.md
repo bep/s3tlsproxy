@@ -9,6 +9,7 @@ WORK IN PROGRESS: Amazon S3 cache with auto TLS and virtual host support.
 Planned features:
 
 * TLS via [https://letsencrypt.org/](https://letsencrypt.org/)
+* Forced HTTPS and configurable security headers 
 * Virtual hosts support with S3 bucket sharing
 * Hot-Reloading of server, including adding and removing virtual hosts
 * Cache to save money on S3 bandwidth
