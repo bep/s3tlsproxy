@@ -20,12 +20,17 @@ import (
 	"net/http"
 	"os"
 
+	"crypto/tls"
+
 	"github.com/gorilla/handlers"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 // Server represents the caching HTTP server.
 type Server struct {
-	cfg    Config
+	cfg        Config
+	tlsEnabled bool
+
 	logger *log.Logger
 
 	server *http.Server
@@ -38,13 +43,39 @@ func NewServer(cfg Config, logger *log.Logger) (*Server, error) {
 
 	h.Handle("/", handlers.LoggingHandler(os.Stdout, handler(cfg, logger)))
 
-	s := &http.Server{Addr: cfg.ServerAddr, Handler: h}
+	tlsEnabled, err := cfg.isTLSConfigured()
+	if err != nil {
+		return nil, err
+	}
 
-	return &Server{cfg: cfg, logger: logger, server: s}, nil
+	var s *http.Server
+
+	if tlsEnabled {
+		m := autocert.Manager{
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist(cfg.hostNames()...),
+			Cache:      autocert.DirCache(cfg.TLSCertsDir),
+		}
+		s = &http.Server{
+			Addr:      cfg.ServerAddr,
+			TLSConfig: &tls.Config{GetCertificate: m.GetCertificate},
+			Handler:   h,
+		}
+	} else {
+		s = &http.Server{
+			Addr:    cfg.ServerAddr,
+			Handler: h,
+		}
+	}
+
+	return &Server{cfg: cfg, logger: logger, server: s, tlsEnabled: tlsEnabled}, nil
 }
 
 func (s *Server) Serve() error {
 	s.logger.Printf("Listening on %s ...\n", s.cfg.ServerAddr)
+	if s.tlsEnabled {
+		return s.server.ListenAndServeTLS("", "")
+	}
 	return s.server.ListenAndServe()
 }
 
