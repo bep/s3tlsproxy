@@ -40,7 +40,7 @@ func (c Commandeer) runServer() error {
 
 	go func() {
 		if err := server.Serve(); err != nil {
-			c.logger.Error(err)
+			c.logger.Error("serve", err)
 			os.Exit(-1)
 		}
 	}()
