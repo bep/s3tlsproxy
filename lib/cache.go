@@ -115,10 +115,10 @@ func (c *cacheHandler) handleRequest(rw http.ResponseWriter, req *http.Request) 
 			for _, vv := range v {
 				rw.Header().Add(k, vv)
 			}
-
-			http.ServeContent(rw, req, urlPath, meta.ModTime, f)
-			return nil
 		}
+		http.ServeContent(rw, req, urlPath, meta.ModTime, f)
+		return nil
+
 	}
 
 	meta, err = c.getAndWriteFile(urlPath, host, rw, req)
