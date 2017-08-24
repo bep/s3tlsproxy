@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/asdine/storm"
 )
 
@@ -96,7 +98,7 @@ func (c *cacheHandler) handleRequest(rw http.ResponseWriter, req *http.Request) 
 	}
 
 	if meta != nil {
-		c.logger.Debug("fileMeta", meta.Filename, "status", meta.StatusCode, "header", meta.Header)
+		c.logger.Debug("area", "cache", "filename", meta.Filename, "status", meta.StatusCode, "header", meta.Header)
 
 		f, err := c.getFile(relPath)
 		if err != nil {
@@ -201,7 +203,7 @@ func (c *cacheHandler) doWithDB(f func(db *storm.DB) error) error {
 }
 
 func (c *cacheHandler) openDB() (*storm.DB, error) {
-	return storm.Open(c.cfg.DBFilename)
+	return storm.Open(c.cfg.DBFilename, storm.BoltOptions(0600, &bolt.Options{Timeout: 5 * time.Second}))
 }
 
 // Plans:

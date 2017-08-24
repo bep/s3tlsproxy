@@ -34,16 +34,26 @@ type Server struct {
 }
 
 type httpHandlers struct {
-	cfg    Config
-	logger *Logger
+	c *cacheHandler
 }
 
 func NewServer(cfg Config, logger *Logger) (*Server, error) {
 	// TODO(bep) validate config
 
 	h := http.NewServeMux()
-	mw := &httpHandlers{cfg: cfg, logger: logger}
+	c := newCacheHandler(cfg, logger)
+	mw := &httpHandlers{c: c}
 
+	var purger http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
+		prefix := r.FormValue("prefix")
+		if prefix != "" {
+			if err := c.purgePrefix(prefix); err != nil {
+				c.logger.Error("area", "cache", "tag", "purge", "prefix", prefix, "error", err)
+			}
+		}
+	}
+
+	h.Handle("/purge", mw.secure(purger))
 	h.Handle("/", mw.secure(mw.serveFile()))
 
 	tlsEnabled, err := cfg.isTLSConfigured()
@@ -87,12 +97,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func (m *httpHandlers) serveFile() http.HandlerFunc {
-	c := newCacheHandler(m.cfg, m.logger)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		// TODO containsDotDot https://github.com/golang/go/blob/f9cf8e5ab11c7ea3f1b9fde302c0a325df020b1a/src/net/http/fs.go#L665
-		err := c.handleRequest(w, r)
+		err := m.c.handleRequest(w, r)
 		if err != nil {
-			m.logger.Error("handleRequest", err)
+			m.c.logger.Error("handleRequest", err)
 			// TODO(bep) status code/err handling
 		}
 	}

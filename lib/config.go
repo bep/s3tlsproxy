@@ -25,6 +25,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/kit/log/term"
 )
 
 type Config struct {
@@ -95,9 +96,32 @@ func LoadConfig(filename string) (Config, error) {
 
 func (c Config) CreateLogger() *Logger {
 	// TODO(bep) configure
-	logger := log.NewLogfmtLogger(os.Stdout)
-	logger = level.NewFilter(logger, level.AllowAll())
+	//logger := log.NewLogfmtLogger(os.Stdout)
+	colorFn := func(keyvals ...interface{}) term.FgBgColor {
+		for i := 0; i < len(keyvals)-1; i += 2 {
+			if keyvals[i] != "level" {
+				continue
+			}
+			switch keyvals[i+1] {
+			case "debug":
+				return term.FgBgColor{Fg: term.DarkGray}
+			case "info":
+				return term.FgBgColor{Fg: term.Gray}
+			case "warn":
+				return term.FgBgColor{Fg: term.Yellow}
+			case "error":
+				return term.FgBgColor{Fg: term.Red}
+			case "crit":
+				return term.FgBgColor{Fg: term.Gray, Bg: term.DarkRed}
+			default:
+				return term.FgBgColor{}
+			}
+		}
+		return term.FgBgColor{}
+	}
 
+	logger := term.NewLogger(os.Stdout, log.NewLogfmtLogger, colorFn)
+	logger = level.NewFilter(logger, level.AllowAll())
 	l := NewLogger(logger)
 
 	return l

@@ -103,8 +103,6 @@ func (s s3Client) getAndWrite(path string, host Host,
 		CreatedAt:  now,
 	}
 
-	s.logger.Debug("newFileMeta", fm.Filename, "status", fm.StatusCode, "header", fm.Header)
-
 	for k, v := range fm.Header {
 		for _, vv := range v {
 			rw.Header().Add(k, vv)
@@ -113,7 +111,7 @@ func (s s3Client) getAndWrite(path string, host Host,
 
 	rw.WriteHeader(resp.StatusCode)
 
-	s.logger.Debug("s3StreamFrom", path, "status", resp.StatusCode)
+	s.logger.Debug("area", "s3", "filename", fm.Filename, "status", resp.StatusCode)
 
 	var content io.Reader
 

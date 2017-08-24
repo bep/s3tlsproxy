@@ -23,7 +23,7 @@ import (
 func (m *httpHandlers) secure(h http.Handler) http.Handler {
 	// TODO(bep) => config
 	return secure.New(secure.Options{
-		AllowedHosts:         m.cfg.hostNames(),
+		AllowedHosts:         m.c.cfg.hostNames(),
 		HostsProxyHeaders:    []string{"X-Forwarded-Host"},
 		SSLRedirect:          true,
 		SSLHost:              "",
