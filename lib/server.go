@@ -18,6 +18,9 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
+
+	"github.com/gorilla/handlers"
 )
 
 // Server represents the caching HTTP server.
@@ -32,7 +35,8 @@ func NewServer(cfg Config, logger *log.Logger) (*Server, error) {
 	// TODO(bep) validate config
 
 	h := http.NewServeMux()
-	h.HandleFunc("/", handler(cfg, logger))
+
+	h.Handle("/", handlers.LoggingHandler(os.Stdout, handler(cfg, logger)))
 
 	s := &http.Server{Addr: cfg.ServerAddr, Handler: h}
 
@@ -51,6 +55,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 func handler(cfg Config, logger *log.Logger) http.HandlerFunc {
 	c := newCacheHandler(cfg, logger)
 	return func(w http.ResponseWriter, r *http.Request) {
+		// TODO containsDotDot https://github.com/golang/go/blob/f9cf8e5ab11c7ea3f1b9fde302c0a325df020b1a/src/net/http/fs.go#L665
 		err := c.handleRequest(w, r)
 		if err != nil {
 			logger.Println("error:", err)
