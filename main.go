@@ -30,6 +30,7 @@ var (
 func main() {
 
 	c := cmd.New()
+
 	if err := c.Execute(); err != nil {
 		os.Exit(-1)
 	}

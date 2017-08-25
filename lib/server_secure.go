@@ -20,6 +20,36 @@ import (
 	"github.com/unrolled/secure"
 )
 
+func (m *httpHandlers) validateSig(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// TODO(bep) check if the logic below holds water (re. proxies etc.)
+		url := r.URL.String()
+
+		scheme := r.URL.Scheme
+		if scheme == "" {
+			scheme = "https://"
+		}
+
+		fullURL := scheme + r.Host + url
+
+		sig := NewSig(m.c.cfg.SecretKey)
+
+		verified, err := sig.VerifyURL(fullURL, r.Method)
+		m.c.logger.Debug("area", "sig", "url", fullURL, "verified", verified, "err", err)
+		// TODO(bep) status codes handling for the below.
+		if !verified {
+			return
+		}
+
+		if err != nil {
+			m.c.logger.Error("area", "sig", "error", err)
+			return
+		}
+
+		h.ServeHTTP(w, r)
+	})
+}
+
 func (m *httpHandlers) secure(h http.Handler) http.Handler {
 	// TODO(bep) => config
 	return secure.New(secure.Options{

@@ -25,15 +25,12 @@ import (
 	"github.com/bep/s3tlsproxy/lib"
 )
 
-func (c Commandeer) runServer() error {
-	cfg, err := c.loadConfig()
-	if err != nil {
+func (c *Commandeer) runServer() error {
+	if err := c.init(); err != nil {
 		return err
 	}
 
-	c.logger = cfg.CreateLogger()
-
-	server, err := lib.NewServer(cfg, c.logger)
+	server, err := lib.NewServer(c.cfg, c.logger)
 	if err != nil {
 		return err
 	}

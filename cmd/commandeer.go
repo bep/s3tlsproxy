@@ -15,21 +15,36 @@
 package cmd
 
 import (
-	"github.com/bep/s3tlsproxy/lib"
+	"os"
 
+	"github.com/bep/s3tlsproxy/lib"
+	"github.com/go-kit/kit/log"
 	"github.com/spf13/cobra"
 )
 
 // Commandeer is the entry point for the different commands.
 type Commandeer struct {
 	cfgFile string
-	logger  *lib.Logger
+
+	cfg    lib.Config
+	logger *lib.Logger
 
 	rootCmd *cobra.Command
 }
 
-func New() Commandeer {
-	c := Commandeer{}
+func (c *Commandeer) init() error {
+	cfg, err := c.loadConfig()
+	if err != nil {
+		return err
+	}
+	c.cfg = cfg
+	c.logger = cfg.CreateLogger()
+
+	return nil
+}
+
+func New() *Commandeer {
+	c := &Commandeer{logger: lib.NewLogger(log.NewLogfmtLogger(os.Stdout))}
 
 	c.rootCmd = &cobra.Command{
 		Use:   "s3tlsproxy",
@@ -40,6 +55,7 @@ func New() Commandeer {
 	}
 
 	c.rootCmd.PersistentFlags().StringVar(&c.cfgFile, "config", "", "config file (default is ./config.toml)")
+	c.rootCmd.AddCommand(c.newUrls().cmd)
 
 	return c
 }
@@ -52,7 +68,7 @@ func (c Commandeer) loadConfig() (lib.Config, error) {
 	return lib.LoadConfig(filename)
 }
 
-func (c Commandeer) Execute() error {
+func (c *Commandeer) Execute() error {
 	if err := c.rootCmd.Execute(); err != nil {
 		c.logger.Error(err)
 		return err
