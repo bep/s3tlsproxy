@@ -67,17 +67,17 @@ type readSeekCloser interface {
 	io.Closer
 }
 
-type cacheHandler struct {
+type cache struct {
 	cfg     Config
 	logger  *Logger
 	storage s3Client
 }
 
-func newCacheHandler(cfg Config, logger *Logger) *cacheHandler {
-	return &cacheHandler{cfg: cfg, logger: logger, storage: s3Client{cfg: cfg, logger: logger}}
+func newCache(cfg Config, logger *Logger) *cache {
+	return &cache{cfg: cfg, logger: logger, storage: s3Client{cfg: cfg, logger: logger}}
 }
 
-func (c *cacheHandler) handleRequest(rw http.ResponseWriter, req *http.Request) error {
+func (c *cache) handleRequest(rw http.ResponseWriter, req *http.Request) error {
 	urlPath := strings.TrimLeft(req.URL.Path, " /")
 
 	if urlPath == "" || strings.HasSuffix(urlPath, "/") {
@@ -135,7 +135,7 @@ func (c *cacheHandler) handleRequest(rw http.ResponseWriter, req *http.Request) 
 	return err
 }
 
-func (c *cacheHandler) getFileMeta(relPath string) (*fileMeta, error) {
+func (c *cache) getFileMeta(relPath string) (*fileMeta, error) {
 	db, err := c.openDB()
 	if err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ func (c *cacheHandler) getFileMeta(relPath string) (*fileMeta, error) {
 	return &fm, nil
 }
 
-func (c *cacheHandler) getAndWriteFile(
+func (c *cache) getAndWriteFile(
 	urlPath string, host Host,
 	rw http.ResponseWriter, req *http.Request) (*fileMeta, error) {
 
@@ -180,7 +180,7 @@ func (c *cacheHandler) getAndWriteFile(
 
 }
 
-func (c *cacheHandler) getFile(relPath string) (readSeekCloser, error) {
+func (c *cache) getFile(relPath string) (readSeekCloser, error) {
 	filename := filepath.Join(c.cfg.CacheDir, filepath.FromSlash(relPath))
 	f, err := os.Open(filename)
 	if err != nil {
@@ -193,7 +193,7 @@ func (c *cacheHandler) getFile(relPath string) (readSeekCloser, error) {
 }
 
 // TODO(bep) transactions
-func (c *cacheHandler) doWithDB(f func(db *storm.DB) error) error {
+func (c *cache) doWithDB(f func(db *storm.DB) error) error {
 	db, err := c.openDB()
 	if err != nil {
 		return err
@@ -202,26 +202,6 @@ func (c *cacheHandler) doWithDB(f func(db *storm.DB) error) error {
 	return f(db)
 }
 
-func (c *cacheHandler) openDB() (*storm.DB, error) {
-	return storm.Open(c.cfg.DBFilename, storm.BoltOptions(0600, &bolt.Options{Timeout: 5 * time.Second}))
+func (c *cache) openDB() (*storm.DB, error) {
+	return storm.Open(c.cfg.DBFilename, storm.BoltOptions(0600, &bolt.Options{Timeout: 10 * time.Second}))
 }
-
-// Plans:
-//
-// Request file:
-// If db.File => if os.File => OK
-// If db.File => if !os.File => delete db.File => stream and save db.File and os.File
-// If !db.File  => stream and save db.File and os.File
-
-// On server start:
-// For each os.File:
-// If not in db.File => delete os.File
-// For each db.File:
-// If not in os.File => delete db.File
-// Else: Set some in memory size counter.
-
-// On free space:
-// Order by CreatedAt asc
-
-// On Garbage Collect:
-//

@@ -22,7 +22,7 @@ import (
 	"github.com/asdine/storm/q"
 )
 
-func (c *cacheHandler) purgePrefix(prefix string) error {
+func (c *cache) purgePrefix(prefix string) error {
 	db, err := c.openDB()
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func (c *cacheHandler) purgePrefix(prefix string) error {
 
 // This is a Least Recently Used (LRU) cache.
 // So: Sort by created and delete until we reach the target.
-func (c *cacheHandler) shrinkTo(target int64) error {
+func (c *cache) shrinkTo(target int64) error {
 	db, err := c.openDB()
 	if err != nil {
 		return err

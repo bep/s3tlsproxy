@@ -16,11 +16,18 @@ package lib
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"path"
 
 	"crypto/tls"
 
 	"golang.org/x/crypto/acme/autocert"
+)
+
+const (
+	// Make it unlikely that this clashes with some other static resource.
+	appNS = "__s3p"
 )
 
 // Server represents the caching HTTP server.
@@ -34,35 +41,50 @@ type Server struct {
 }
 
 type httpHandlers struct {
-	c *cacheHandler
+	c *cache
 }
 
 func NewServer(cfg Config, logger *Logger) (*Server, error) {
 	// TODO(bep) validate config
 
-	h := http.NewServeMux()
-	c := newCacheHandler(cfg, logger)
-	mw := &httpHandlers{c: c}
+	var (
+		h  = http.NewServeMux()
+		c  = newCache(cfg, logger)
+		mw = &httpHandlers{c: c}
+	)
 
 	var purger http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
 		prefix := r.FormValue("prefix")
-		if prefix != "" {
-			if err := c.purgePrefix(prefix); err != nil {
-				c.logger.Error("area", "cache", "tag", "purge", "prefix", prefix, "error", err)
-			}
+		host, found := cfg.host(r.Host)
+		if !found {
+			c.logger.Error("area", "cache", "tag", "purge", "host_not_found", r.Host)
+			return
 		}
+
+		prefix = path.Join(host.Name, prefix)
+
+		if err := c.purgePrefix(prefix); err != nil {
+			c.logger.Error("area", "cache", "tag", "purge", "prefix", prefix, "error", err)
+		}
+
 	}
 
 	var shrinker http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
-		target := 50 << 10
+		target := 50 << 10 // TODO(bep) Take value from conf
 		if err := c.shrinkTo(int64(target)); err != nil {
 			c.logger.Error("area", "cache", "tag", "shrink", "error", err)
 		}
 	}
 
-	h.Handle("/purge", mw.secure(mw.validateSig(purger)))
-	h.Handle("/shrink", mw.secure(mw.validateSig(shrinker)))
-	h.Handle("/", mw.secure(mw.serveFile()))
+	var (
+		// Make the handler chaining a little bit more fluid.
+		secure      = mw.secure
+		validateSig = mw.validateSig
+	)
+
+	h.Handle(fmt.Sprintf("/%s/purge", appNS), secure(validateSig(purger)))
+	h.Handle(fmt.Sprintf("/%s/shrink", appNS), secure(validateSig(shrinker)))
+	h.Handle("/", secure(mw.serveFile()))
 
 	tlsEnabled, err := cfg.isTLSConfigured()
 	if err != nil {
