@@ -17,6 +17,7 @@ package lib
 import (
 	"net/http"
 
+	"github.com/bep/s3tlsproxy/lib/sig"
 	"github.com/unrolled/secure"
 )
 
@@ -32,7 +33,7 @@ func (m *httpHandlers) validateSig(h http.Handler) http.Handler {
 
 		fullURL := scheme + r.Host + url
 
-		sig := NewSig(m.c.cfg.SecretKey)
+		sig := sig.New(m.c.cfg.SecretKey)
 
 		verified, err := sig.VerifyURL(fullURL, r.Method)
 		m.c.logger.Debug("area", "sig", "url", fullURL, "verified", verified, "err", err)

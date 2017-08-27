@@ -17,10 +17,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/bep/s3tlsproxy/lib"
-
+	"github.com/bep/s3tlsproxy/lib/sig"
 	"github.com/spf13/cobra"
 )
 
@@ -34,6 +35,7 @@ type urls struct {
 	url      string
 	method   string
 	duration string
+	exclude  string
 }
 
 func (c *Commandeer) newUrls() urls {
@@ -62,8 +64,14 @@ func (c *Commandeer) newUrls() urls {
 				return fmt.Errorf("invalid value for 'duration': %s", err)
 			}
 
-			s := lib.NewSig(c.cfg.SecretKey)
-			signedURL, err := s.SignURL(u.url, u.method, duration)
+			s := sig.New(c.cfg.SecretKey)
+
+			var excludeParams []string
+			if u.exclude != "" {
+				excludeParams = strings.Split(u.exclude, ",")
+			}
+
+			signedURL, err := s.SignURL(u.url, u.method, duration, excludeParams...)
 			if err != nil {
 				return err
 			}
@@ -77,6 +85,7 @@ func (c *Commandeer) newUrls() urls {
 	cmdSign.Flags().StringVarP(&u.url, "url", "", "", "the URL to sign")
 	cmdSign.Flags().StringVarP(&u.method, "method", "", "", "the HTTP method")
 	cmdSign.Flags().StringVarP(&u.duration, "duration", "", "", "time to live")
+	cmdSign.Flags().StringVarP(&u.exclude, "exclude", "", "", "optional comma separated list of HTTP paramaters to exclude when signing")
 
 	cmd.AddCommand(cmdSign)
 	u.cmd = cmd

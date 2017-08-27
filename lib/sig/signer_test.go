@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package lib
+package sig
 
 import (
+	"fmt"
 	"net/url"
 	"testing"
 
@@ -32,7 +33,28 @@ func TestSignURL(t *testing.T) {
 
 	signed, err := sig.SignURL("https://example.org:1234/path/?a=b", "GET", 10*time.Hour)
 	assert.NoError(err)
-	verified, err := sig.VerifyURL(signed, "GET")
+	verified, err := sig.VerifyURL("https://example.org:1234/path/?a=b&expires=89647200&sig=b6X0i48Tjke0sYjB5WZMM2d14U8%3D", "GET")
+	assert.NoError(err)
+	assert.True(verified)
+
+	// Query param mismatch
+	verified, err = sig.VerifyURL("https://example.org:1234/path/?a=c&expires=89647200&sig=b6X0i48Tjke0sYjB5WZMM2d14U8%3D", "GET")
+	assert.NoError(err)
+	assert.False(verified)
+
+	// Query param mismatch allowed
+	signed, err = sig.SignURL("https://example.org:1234/path/?a=b", "GET", 10*time.Hour, "a")
+	fmt.Println(">>", signed)
+
+	verified, err = sig.VerifyURL("https://example.org:1234/path/?a=b&exclude=a&expires=89647200&sig=BKDEkk1vIaPKnp_Zb2jdw5ZZI84%3D", "GET")
+	assert.NoError(err)
+	assert.True(verified)
+
+	verified, err = sig.VerifyURL("https://example.org:1234/path/?a=c&exclude=a&expires=89647200&sig=BKDEkk1vIaPKnp_Zb2jdw5ZZI84%3D", "GET")
+	assert.NoError(err)
+	assert.True(verified)
+
+	verified, err = sig.VerifyURL("https://example.org:1234/path/?exclude=a&expires=89647200&sig=BKDEkk1vIaPKnp_Zb2jdw5ZZI84%3D", "GET")
 	assert.NoError(err)
 	assert.True(verified)
 

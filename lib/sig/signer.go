@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package lib
+package sig
 
 import (
 	"crypto/sha1"
@@ -20,6 +20,7 @@ import (
 	"errors"
 	urls "net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -28,11 +29,11 @@ type Sig struct {
 	now    func() time.Time
 }
 
-func NewSig(secret string) Sig {
+func New(secret string) Sig {
 	return Sig{secret: secret, now: time.Now}
 }
 
-func (s Sig) SignURL(url, httpMethod string, ttl time.Duration) (string, error) {
+func (s Sig) SignURL(url, httpMethod string, ttl time.Duration, excludedQueryParams ...string) (string, error) {
 	if url == "" || httpMethod == "" || ttl <= 0 {
 		return "", errors.New("invalid argument(s)")
 	}
@@ -48,6 +49,20 @@ func (s Sig) SignURL(url, httpMethod string, ttl time.Duration) (string, error) 
 	query.Set("method", httpMethod)
 	query.Set("expires", strconv.FormatInt(s.now().Add(ttl).Unix(), 10))
 
+	var exlcudedKeyVals = make(map[string]string)
+
+	if len(excludedQueryParams) > 0 {
+		query.Set("exclude", strings.Join(excludedQueryParams, ","))
+		for _, excluded := range excludedQueryParams {
+			// Not included in signing, will re-add them to the URL later.
+			excludedVal := query.Get(excluded)
+			if excludedVal != "" {
+				exlcudedKeyVals[excluded] = excludedVal
+				query.Del(excluded)
+			}
+		}
+	}
+
 	parsedURL.RawQuery = query.Encode()
 
 	sig := s.sum(parsedURL.String())
@@ -55,6 +70,10 @@ func (s Sig) SignURL(url, httpMethod string, ttl time.Duration) (string, error) 
 	query = parsedURL.Query()
 	query.Del("method")
 	query.Del("secret")
+
+	for k, v := range exlcudedKeyVals {
+		query.Set(k, v)
+	}
 	query.Set("sig", sig)
 
 	parsedURL.RawQuery = query.Encode()
@@ -75,6 +94,16 @@ func (s Sig) VerifyURL(url, httpMethod string) (bool, error) {
 
 	if sig == "" || expiresStr == "" {
 		return false, errors.New("invalid URL")
+	}
+
+	exludedParamsStr := query.Get("exclude")
+
+	if exludedParamsStr != "" {
+		excludedQueryParams := strings.Split(exludedParamsStr, ",")
+		for _, key := range excludedQueryParams {
+			query.Del(key)
+		}
+
 	}
 
 	expires, err := strconv.ParseInt(expiresStr, 10, 64)
