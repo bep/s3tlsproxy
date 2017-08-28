@@ -78,6 +78,21 @@ func main() {
 	if err := purgeCache(stats, cachePurgeURL); err != nil {
 		log.Fatal(err)
 	}
+
+	// Testing
+	userName := os.Getenv("CIRCLE_PROJECT_USERNAME")
+	repoName := os.Getenv("CIRCLE_PROJECT_REPONAME")
+	sha := os.Getenv("CIRCLE_SHA1")
+	if userName != "" && repoName != "" && sha != "" {
+		preview := "https://cdn1.bep.is/"
+		project := githubProject{userName: userName, repoName: repoName}
+		if err := postCommitStatus(project, sha, preview, true); err != nil {
+			fmt.Println("GitHub preview failed:", err)
+		}
+	} else {
+		fmt.Println("Missing GitHub info:", "=>", userName, "=>", repoName, "=>", sha)
+	}
+
 }
 
 func purgeCache(stats lib.DeployStats, cachePurgeURL string) error {

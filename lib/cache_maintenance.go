@@ -17,6 +17,7 @@ package lib
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/asdine/storm"
 	"github.com/asdine/storm/q"
@@ -45,7 +46,7 @@ func (c *cache) purgePrefix(prefix string) error {
 		return err
 	}
 
-	c.logger.Info("area", "cache", "tag", "purge", "prefix", prefix, "count", len(files))
+	c.logger.Info("area", "cache", "tag", "purge", "prefix", prefix, "count", len(files), "time", time.Now())
 
 	for _, file := range files {
 		if err := db.DeleteStruct(&file); err != nil && err != storm.ErrNotFound {
